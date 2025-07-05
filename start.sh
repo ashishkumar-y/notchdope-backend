@@ -1,4 +1,11 @@
 #!/bin/bash
+#!/bin/bash
+
+echo "⏳ Installing yt-dlp..."
+pip install -U yt-dlp
+
+echo "🚀 Starting Node.js server"
+node index.js
 
 # Install missing libraries for Puppeteer & Chrome
 apt-get update && apt-get install -y \

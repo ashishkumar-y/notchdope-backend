@@ -4,8 +4,8 @@
   "description": "Backend for YouTube HD Downloader using yt-dlp and Puppeteer.",
   "main": "index.js",
   "scripts": {
-    "start": "bash start.sh",
-    "dev": "nodemon index.js"
+  "start": "bash start.sh",
+  "dev": "nodemon index.js"
   },
   "author": "Notchdope",
   "license": "MIT",
