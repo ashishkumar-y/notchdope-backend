@@ -242,6 +242,142 @@
 // });
 
 
+// const express = require('express');
+// const cors = require('cors');
+// const helmet = require('helmet');
+// const compression = require('compression');
+// const morgan = require('morgan');
+// const rateLimit = require('express-rate-limit');
+// const { exec } = require('child_process');
+// const fs = require('fs');
+// const path = require('path');
+// const tmp = require('tmp');
+// const simulateVisit = require('./utils/simulateVisit'); // 🧠 Puppeteer cookie injector
+
+// const app = express();
+// app.set('trust proxy', 1); // Required for proper rate limiting headers on Railway
+
+// // ✅ Middleware
+// app.use(cors());
+// app.use(helmet());
+// app.use(compression());
+// app.use(express.json());
+// app.use(morgan('dev'));
+
+// // ✅ Rate limit
+// app.use(rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// }));
+
+// // ✅ Ensure 'downloads' directory exists
+// const downloadDir = path.join(__dirname, 'downloads');
+// if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
+
+// // ✅ GET: YouTube video info
+// app.get('/api/get-video-info/:videoUrl', async (req, res) => {
+//   const videoUrl = decodeURIComponent(req.params.videoUrl);
+//   const cookieString = await simulateVisit(videoUrl);
+
+//   if (!cookieString) {
+//     return res.status(500).json({ error: '❌ Failed to simulate browser visit' });
+//   }
+
+//   // Write cookies to a temporary file
+//   const cookieFile = tmp.fileSync();
+//   fs.writeFileSync(cookieFile.name, `# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tFALSE\t0\tCONSENT\tYES+\n`);
+//   cookieString.split('; ').forEach(c => {
+//     const [name, value] = c.split('=');
+//     fs.appendFileSync(cookieFile.name, `.youtube.com\tTRUE\t/\tFALSE\t0\t${name}\t${value}\n`);
+//   });
+
+//   const command = `yt-dlp -J --cookies "${cookieFile.name}" "${videoUrl}"`;
+
+//   exec(command, (error, stdout, stderr) => {
+//     cookieFile.removeCallback(); // Clean temp file
+
+//     if (error) {
+//       console.error('❌ yt-dlp error:', stderr || error.message);
+//       return res.status(500).json({ error: '❌ Failed to fetch video info' });
+//     }
+
+//     try {
+//       const info = JSON.parse(stdout);
+//       const formats = info.formats
+//         .filter(f =>
+//           f.ext === 'mp4' &&
+//           f.vcodec?.startsWith('avc1') &&
+//           f.acodec?.startsWith('mp4a') &&
+//           f.vcodec !== 'none' &&
+//           f.acodec !== 'none' &&
+//           f.url
+//         )
+//         .map(f => ({
+//           format: f.format_note || f.format_id,
+//           resolution: f.height || 'audio',
+//           filesize: f.filesize,
+//           url: f.url
+//         }))
+//         .sort((a, b) => b.resolution - a.resolution);
+
+//       res.json({
+//         title: info.title,
+//         thumbnail: info.thumbnail,
+//         formats
+//       });
+//     } catch (parseError) {
+//       console.error('❌ JSON parse error:', parseError.message);
+//       res.status(500).json({ error: '❌ Failed to parse yt-dlp output' });
+//     }
+//   });
+// });
+
+// // ✅ GET: Download video at quality
+// app.get('/api/download/:videoUrl/:quality', async (req, res) => {
+//   const videoUrl = decodeURIComponent(req.params.videoUrl);
+//   const quality = req.params.quality;
+//   const fileName = `video_${quality}p_${Date.now()}.mp4`;
+//   const outputPath = path.join(downloadDir, fileName);
+
+//   const command = `yt-dlp -f "bv*[vcodec^=avc1][height<=${quality}]+ba[acodec^=mp4a]" --merge-output-format mp4 "${videoUrl}" -o "${outputPath}"`;
+
+//   exec(command, (error, stdout, stderr) => {
+//     if (error) {
+//       console.error(`❌ Download failed (${quality}p):`, stderr || error.message);
+//       return res.status(500).json({ error: `❌ Download failed for ${quality}p` });
+//     }
+
+//     res.download(outputPath, fileName, (err) => {
+//       if (err) console.error('❌ File send error:', err.message);
+//       fs.unlink(outputPath, () => {});
+//     });
+//   });
+// });
+
+// // ✅ Health check
+// app.get('/', (req, res) => {
+//   res.send('✅ Notchdope backend is running fine');
+// });
+
+// // ✅ 404 fallback
+// app.use((req, res) => {
+//   res.status(404).json({ error: '❌ Route not found' });
+// });
+
+// // ✅ Start
+// const PORT = process.env.PORT || 6900;
+// app.listen(PORT, () => {
+//   console.log(`🚀 Server running on port ${PORT}`);
+// });
+
+
+
+
+
+
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -251,20 +387,18 @@ const rateLimit = require('express-rate-limit');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const tmp = require('tmp');
-const simulateVisit = require('./utils/simulateVisit'); // 🧠 Puppeteer cookie injector
 
 const app = express();
-app.set('trust proxy', 1); // Required for proper rate limiting headers on Railway
+app.set('trust proxy', 1); // Required for rate limiting in some platforms
 
-// ✅ Middleware
+// ✅ Middleware setup
 app.use(cors());
 app.use(helmet());
 app.use(compression());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// ✅ Rate limit
+// ✅ Rate limiting
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
@@ -276,28 +410,16 @@ app.use(rateLimit({
 const downloadDir = path.join(__dirname, 'downloads');
 if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
 
-// ✅ GET: YouTube video info
-app.get('/api/get-video-info/:videoUrl', async (req, res) => {
+// ✅ Cookie file path (from browser)
+const cookiePath = path.join(__dirname, 'youtube-cookies.txt');
+
+// ✅ GET: Fetch YouTube video info
+app.get('/api/get-video-info/:videoUrl', (req, res) => {
   const videoUrl = decodeURIComponent(req.params.videoUrl);
-  const cookieString = await simulateVisit(videoUrl);
 
-  if (!cookieString) {
-    return res.status(500).json({ error: '❌ Failed to simulate browser visit' });
-  }
-
-  // Write cookies to a temporary file
-  const cookieFile = tmp.fileSync();
-  fs.writeFileSync(cookieFile.name, `# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tFALSE\t0\tCONSENT\tYES+\n`);
-  cookieString.split('; ').forEach(c => {
-    const [name, value] = c.split('=');
-    fs.appendFileSync(cookieFile.name, `.youtube.com\tTRUE\t/\tFALSE\t0\t${name}\t${value}\n`);
-  });
-
-  const command = `yt-dlp -J --cookies "${cookieFile.name}" "${videoUrl}"`;
+  const command = `yt-dlp -J --cookies "${cookiePath}" "${videoUrl}"`;
 
   exec(command, (error, stdout, stderr) => {
-    cookieFile.removeCallback(); // Clean temp file
-
     if (error) {
       console.error('❌ yt-dlp error:', stderr || error.message);
       return res.status(500).json({ error: '❌ Failed to fetch video info' });
@@ -334,14 +456,14 @@ app.get('/api/get-video-info/:videoUrl', async (req, res) => {
   });
 });
 
-// ✅ GET: Download video at quality
-app.get('/api/download/:videoUrl/:quality', async (req, res) => {
+// ✅ GET: Download specific video quality
+app.get('/api/download/:videoUrl/:quality', (req, res) => {
   const videoUrl = decodeURIComponent(req.params.videoUrl);
   const quality = req.params.quality;
   const fileName = `video_${quality}p_${Date.now()}.mp4`;
   const outputPath = path.join(downloadDir, fileName);
 
-  const command = `yt-dlp -f "bv*[vcodec^=avc1][height<=${quality}]+ba[acodec^=mp4a]" --merge-output-format mp4 "${videoUrl}" -o "${outputPath}"`;
+  const command = `yt-dlp -f "bv*[vcodec^=avc1][height<=${quality}]+ba[acodec^=mp4a]" --merge-output-format mp4 --cookies "${cookiePath}" "${videoUrl}" -o "${outputPath}"`;
 
   exec(command, (error, stdout, stderr) => {
     if (error) {
@@ -366,8 +488,8 @@ app.use((req, res) => {
   res.status(404).json({ error: '❌ Route not found' });
 });
 
-// ✅ Start
+// ✅ Start server
 const PORT = process.env.PORT || 6900;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
